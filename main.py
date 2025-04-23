@@ -25,6 +25,7 @@ for resource in nltk_resources:
 stop_words = set(stopwords.words('english'))
 ps = PorterStemmer()
 wnl = WordNetLemmatizer()
+sanitizer = InputSanitizer()
 
 # 3. Habilitar barra de progresso do tqdm para pandas
 tqdm.pandas(desc="Preprocessing Reviews")
