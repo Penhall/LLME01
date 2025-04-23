@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 
-import sys  # Adicionado para usar sys.exit
+import sys
 import nltk
 import pandas as pd
+import logging
+from security.input_sanitizer import InputSanitizer
+from error_handling import DataLoadingError, configure_logging
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from tqdm import tqdm
 
 # 1. Baixar recursos necessários do NLTK
-nltk.download('punkt')       # Tokenizer padrão para múltiplos idiomas
-nltk.download('punkt_tab')   # Submodelo que evita erros de busca
-nltk.download('stopwords')   # Lista de stopwords
-nltk.download('wordnet')     # Base lexical para lematização
+nltk_resources = ['punkt', 'punkt_tab', 'stopwords', 'wordnet']
+
+for resource in nltk_resources:
+    try:
+        nltk.download(resource)
+    except Exception as e:
+        logging.error(f"Falha ao baixar recurso '{resource}': {str(e)}")
+        raise DataLoadingError(f"Erro na inicialização do NLTK: {resource}")
 
 # 2. Instanciar ferramentas de pré-processamento
 stop_words = set(stopwords.words('english'))
@@ -24,26 +31,34 @@ tqdm.pandas(desc="Preprocessing Reviews")
 
 
 def preprocess_text(text: str):
-    """
-    Executa tokenização, remoção de stopwords,
-    stemming e lematização em um único texto.
+    """Processa texto com sanitização e normalização"""
+    try:
+        # Sanitização segura
+        clean_text = sanitizer.sanitize(text)
+        
+        # Tokenização e filtragem
+        tokens = word_tokenize(clean_text, language='english')
+        
+        # Filtragem: manter somente tokens alfabéticos e não-stopwords
+        filtered = [
+            t.lower()
+            for t in tokens
+            if t.isalpha() and t.lower() not in stop_words
+        ]
+        
+        # Stemming e lematização
+        stems = [ps.stem(t) for t in filtered]
+        lemmas = [wnl.lemmatize(t) for t in filtered]
 
-    Parâmetros:
-    ----------
-    text : str
-        Texto bruto da review.
+        return stems, lemmas
+    except Exception as e:
+        logging.error(f"Erro no processamento: {str(e)}")
+        raise
+        
+        # Tokenização e filtragem
+        tokens = word_tokenize(clean_text, language='english')
 
-    Retorna:
-    -------
-    stems : list[str]
-        Lista de raízes (stems) após aplicar PorterStemmer.
-    lemmas : list[str]
-        Lista de lemas após aplicar WordNetLemmatizer.
-    """
-    # 1. Tokenização (considera apenas tokens alfabéticos)
-    tokens = word_tokenize(text, language='english')
-
-    # 2. Filtragem: manter somente tokens alfabéticos e não-stopwords
+        # Filtragem: manter somente tokens alfabéticos e não-stopwords
     filtered = [
         t.lower()
         for t in tokens
@@ -59,28 +74,47 @@ def preprocess_text(text: str):
     return stems, lemmas
 
 
-def main():
-    # 4. Carregar o DataFrame a partir do CSV
-    # Usando caminho relativo para portabilidade
-    caminho_csv = 'archive/IMDB Dataset.csv'
+def load_dataset(path: str) -> pd.DataFrame:
+    """Carrega e valida o dataset"""
     try:
-        df = pd.read_csv(caminho_csv)
-    except FileNotFoundError:
-        print(f"Erro: Arquivo não encontrado em '{caminho_csv}'.")
-        print("Verifique se o arquivo 'IMDB Dataset.csv' está na pasta 'archive'.")
-        sys.exit(1)  # Termina a execução se o arquivo não for encontrado
+        df = pd.read_csv(path)
+        
+        # Validar estrutura do dataset
+        required_columns = {'review', 'sentiment'}
+        if not required_columns.issubset(df.columns):
+            raise DataLoadingError("Dataset incompleto - colunas necessárias: review, sentiment")
+            
+        return df
+    except Exception as e:
+        logging.error(f"Falha no carregamento: {str(e)}")
+        raise
 
-    # 5. Aplicar pré-processamento com barra de progresso
-    processed = df['review'].progress_apply(preprocess_text)
-    df[['stems', 'lemmas']] = pd.DataFrame(processed.tolist(), index=df.index)
+def main():
+    try:
+        # Carregar dados
+        df = load_dataset('archive/IMDB Dataset.csv')
+        
+        # Processamento com progresso
+        tqdm.pandas(desc="Processamento")
+        df['processed'] = df['review'].progress_apply(preprocess_text)
+        
+        # Extrair resultados
+        df[['stems', 'lemmas']] = pd.DataFrame(
+            df['processed'].tolist(),
+            index=df.index
+        )
 
-    # 6. Exibir um resumo para verificação
-    print("=== Primeiras 5 linhas após pré-processamento ===")
-    print(df[['review', 'stems', 'lemmas']].head(), end="\n\n")
+        # Resultados
+        print("\n=== Estatísticas ===")
+        print(f"Reviews processadas: {len(df)}")
+        print(f"Média tokens/review: {df['stems'].apply(len).mean():.1f}")
 
-    # 7. Estatísticas básicas
-    print(f"Média de stems por review: {df['stems'].apply(len).mean():.2f}")
-    print(f"Média de lemmas por review: {df['lemmas'].apply(len).mean():.2f}")
+    except DataLoadingError as e:
+        logging.error(f"Erro crítico: {str(e)}")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Erro inesperado: {str(e)}")
+        sys.exit(2)
 
 
 if __name__ == "__main__":

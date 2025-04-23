@@ -1,6 +1,4 @@
-# Principais dependências identificadas a partir de main.py
-# Execute 'pip install -r requirements.txt' para instalar
-# Considere fixar as versões após a instalação para garantir reprodutibilidade
-nltk
-pandas
-tqdm
+nltk==3.8.1
+pandas==2.2.3
+tqdm==4.67.1
+beautifulsoup4==4.12.3
