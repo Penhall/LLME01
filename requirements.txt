@@ -1,0 +1,6 @@
+# Principais dependências identificadas a partir de main.py
+# Execute 'pip install -r requirements.txt' para instalar
+# Considere fixar as versões após a instalação para garantir reprodutibilidade
+nltk
+pandas
+tqdm

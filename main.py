@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys  # Adicionado para usar sys.exit
 import nltk
 import pandas as pd
 from nltk.tokenize import word_tokenize
@@ -60,10 +61,14 @@ def preprocess_text(text: str):
 
 def main():
     # 4. Carregar o DataFrame a partir do CSV
-    caminho_csv = (
-        r'C:\Users\flaeu\Documents\projetos-python\09-LLM\Exercicio01 Movie\archive\IMDB Dataset.csv'
-    )
-    df = pd.read_csv(caminho_csv)
+    # Usando caminho relativo para portabilidade
+    caminho_csv = 'archive/IMDB Dataset.csv'
+    try:
+        df = pd.read_csv(caminho_csv)
+    except FileNotFoundError:
+        print(f"Erro: Arquivo não encontrado em '{caminho_csv}'.")
+        print("Verifique se o arquivo 'IMDB Dataset.csv' está na pasta 'archive'.")
+        sys.exit(1)  # Termina a execução se o arquivo não for encontrado
 
     # 5. Aplicar pré-processamento com barra de progresso
     processed = df['review'].progress_apply(preprocess_text)
