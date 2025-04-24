@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import seaborn as sns
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import nltk
@@ -77,14 +78,97 @@ def main():
     # Visualizações
     st.header("Visualizações")
     
-    # Distribuição de sentimentos
-    fig1 = px.pie(df, names='sentiment', title='Distribuição de Sentimentos')
-    st.plotly_chart(fig1, use_container_width=True)
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Sentimentos",
+        "Comprimento",
+        "WordCloud",
+        "Top Palavras"
+    ])
     
-    # Comprimento das reviews
-    fig2 = px.box(df, x='sentiment', y='review_length', 
-                 title='Comprimento das Reviews por Sentimento')
-    st.plotly_chart(fig2, use_container_width=True)
+    with tab1:
+        # Distribuição de sentimentos
+        fig1 = px.pie(df, names='sentiment', title='Distribuição de Sentimentos')
+        st.plotly_chart(fig1, use_container_width=True)
+    
+    with tab2:
+        # Comprimento das reviews
+        fig2 = px.box(df, x='sentiment', y='review_length',
+                     title='Comprimento das Reviews por Sentimento')
+        st.plotly_chart(fig2, use_container_width=True)
+    
+    with tab3:
+        # WordCloud
+        st.subheader("Nuvem de Palavras")
+        try:
+            # Juntar todos os textos
+            text = " ".join(review for review in df['review'])
+            
+            # Gerar wordcloud
+            wordcloud = WordCloud(width=800, height=400, background_color='white',
+                                stopwords=set(stopwords.words('english'))).generate(text)
+            
+            # Mostrar wordcloud
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.imshow(wordcloud, interpolation='bilinear')
+            ax.axis('off')
+            st.pyplot(fig)
+        except Exception as e:
+            st.error(f"Erro ao gerar wordcloud: {str(e)}")
+    
+    with tab4:
+        # Top 20 palavras
+        st.subheader("Top 20 Palavras Mais Frequentes")
+        
+        # Debug: Verificar dados carregados
+        st.write(f"Total de reviews carregadas: {len(df)}")
+        
+        try:
+            from collections import Counter
+            
+            # Tokenizar e contar palavras
+            words = []
+            sample_text = ""
+            for review in df['review']:
+                tokens = word_tokenize(review.lower())
+                filtered_words = [word for word in tokens
+                               if word.isalpha()
+                               and word not in stopwords.words('english')
+                               and len(word) > 2]
+                words.extend(filtered_words)
+                if not sample_text and filtered_words:
+                    sample_text = " ".join(filtered_words[:10])
+            
+            # Debug: Mostrar amostra de palavras processadas
+            st.write(f"Palavras processadas (amostra): {sample_text}")
+            st.write(f"Total de palavras válidas encontradas: {len(words)}")
+            
+            if words:
+                word_counts = Counter(words)
+                top_words = word_counts.most_common(20)
+                
+                # Debug: Mostrar contagem crua
+                st.write("Contagem de palavras (top 5):", dict(top_words[:5]))
+                
+                # Criar gráfico simplificado inicialmente
+                if len(top_words) > 0:
+                    df_words = pd.DataFrame(top_words, columns=['word', 'count'])
+                    
+                    # Tentativa com Plotly (mais robusto que matplotlib)
+                    fig = px.bar(df_words,
+                                x='count',
+                                y='word',
+                                orientation='h',
+                                title='Top 20 Palavras Mais Frequentes',
+                                labels={'count':'Frequência', 'word':'Palavra'})
+                    st.plotly_chart(fig)
+                else:
+                    st.warning("Nenhuma palavra encontrada após filtragem")
+            else:
+                st.warning("Nenhuma palavra válida encontrada para análise")
+                
+        except Exception as e:
+            st.error(f"Erro ao gerar top palavras: {str(e)}")
+            st.error("Detalhes do erro:", e)
 
 if __name__ == "__main__":
     main()
